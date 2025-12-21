@@ -118,9 +118,8 @@ func LoadSecrets() (map[string]string, error) {
 
 // ProjectMetadata stores local project information
 type ProjectMetadata struct {
-	Name        string `json:"name"`
-	RemotePath  string `json:"remote_path"`
-	Initialized bool   `json:"initialized"`
+	Name       string `json:"name"`
+	RemotePath string `json:"remote_path"`
 }
 
 // SaveProjectMetadata saves project metadata to .graft/project.json

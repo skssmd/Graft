@@ -236,8 +236,8 @@ networks:
 	
 	content := fmt.Sprintf(template,
 		p.Name, p.Domain, p.Name, // Header
-		p.Domain, p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, // Frontend
-		p.Domain, p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Backend
+		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, // Frontend
+		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Backend
 		p.Domain, p.Domain, p.Domain, // Footer
 	)
 	return os.WriteFile(path, []byte(content), 0644)

@@ -197,7 +197,7 @@ func runInit() {
 
 	fmt.Printf("\n✨ Project '%s' initialized!\n", projName)
 	fmt.Printf("Local config: .graft/config.json\n")
-	fmt.Printf("Boilerplate: %s-graft.yml\n", projName)
+	fmt.Printf("Boilerplate: graft-compose.yml\n", projName)
 }
 
 func runHostInit() {
