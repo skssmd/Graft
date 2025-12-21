@@ -7,7 +7,7 @@ import (
 	"github.com/skssmd/graft/internal/ssh"
 )
 
-func InitHost(client *ssh.Client, setupInfra bool, stdout, stderr io.Writer) error {
+func InitHost(client *ssh.Client, setupPostgres, setupRedis bool, stdout, stderr io.Writer) error {
 	// Detect OS and set appropriate package manager commands
 	var dockerInstallCmd, composeInstallCmd string
 	
@@ -136,18 +136,12 @@ sudo docker compose -f /opt/graft/gateway/docker-compose.yml up -d`,
 	}
 
 	// Conditionally setup shared infrastructure
-	if setupInfra {
-		fmt.Fprintf(stdout, "\n🔧 Setup Shared Infra (DB & Redis)\n")
+	if setupPostgres || setupRedis {
+		fmt.Fprintf(stdout, "\n🔧 Setup Shared Infra\n")
 		
-		// Check if already running
-		checkCmd := "sudo docker ps | grep graft-postgres && sudo docker ps | grep graft-redis"
-		if err := client.RunCommand(checkCmd, nil, nil); err == nil {
-			fmt.Fprintf(stdout, "   ✅ Shared infrastructure is already running.\n")
-		} else {
-			infraCmd := `sudo tee /opt/graft/infra/docker-compose.yml <<EOF
-version: '3.8'
-services:
-  postgres:
+		var services string
+		if setupPostgres {
+			services += `  postgres:
     container_name: graft-postgres
     image: postgres:alpine
     environment:
@@ -156,21 +150,29 @@ services:
       POSTGRES_DB: graft_internal
     networks:
       - graft-public
-  redis:
+`
+		}
+		if setupRedis {
+			services += `  redis:
     container_name: graft-redis
     image: redis:alpine
     networks:
       - graft-public
+`
+		}
 
+		infraCmd := fmt.Sprintf(`sudo tee /opt/graft/infra/docker-compose.yml <<EOF
+version: '3.8'
+services:
+%s
 networks:
   graft-public:
     external: true
 EOF
-sudo docker compose -f /opt/graft/infra/docker-compose.yml up -d`
-			
-			if err := client.RunCommand(infraCmd, stdout, stderr); err != nil {
-				return fmt.Errorf("shared infrastructure setup failed: %v", err)
-			}
+sudo docker compose -f /opt/graft/infra/docker-compose.yml up -d`, services)
+		
+		if err := client.RunCommand(infraCmd, stdout, stderr); err != nil {
+			return fmt.Errorf("shared infrastructure setup failed: %v", err)
 		}
 	} else {
 		fmt.Fprintf(stdout, "\n⏭️  Skipping shared infrastructure setup\n")

@@ -15,13 +15,14 @@ This means you can use **any** `docker compose` command through Graft!
 
 ---
 
-## Setup Commands
+## Project Commands
 
-### `graft config`
-Configure server connection settings.
+### `graft init`
+Initialize a new Graft project in the current directory and Configure server connection settings.
+
 
 ```bash
-graft config
+graft init
 ```
 
 **Prompts:**
@@ -29,10 +30,20 @@ graft config
 - SSH port (default: 22)
 - SSH user (default: root)
 - SSH key path (default: ~/.ssh/id_rsa)
+- Project name
+- Domain name
 
-**Options:**
-- `--local` - Save config to `.graft/config.json` (project-specific)
-- Without flag - Save to `~/.graft/config.json` (global)
+**Creates:**
+- `graft-compose.yml` - Docker Compose configuration
+- `.graft/config.json` - Local server config (if using --local)
+- `.graft/project.json` - Project metadata (name, remote path)
+
+**Remote Structure:**
+```
+/opt/graft/projects/
+└── <project-name>/
+    ├── graft-compose.yml
+```
 
 ---
 
@@ -52,7 +63,7 @@ graft host init
   - ✅ HTTPS/Let's Encrypt support
   - ✅ HTTP to HTTPS redirect
   - ✅ Automatic SSL certificate management
-- Optionally sets up shared Postgres and Redis
+- Optionally sets up shared Postgres and Redis (separate prompts for each)
 
 **Features:**
 - ✅ OS-agnostic installation
@@ -78,34 +89,7 @@ graft host clean
 
 ---
 
-## Project Commands
 
-### `graft init`
-Initialize a new Graft project in the current directory.
-
-```bash
-graft init
-```
-
-**Prompts:**
-- Project name
-- Domain name
-
-**Creates:**
-- `graft-compose.yml` - Docker Compose configuration
-- `.graft/config.json` - Local server config (if using --local)
-- `.graft/project.json` - Project metadata (name, remote path)
-
-**Remote Structure:**
-```
-/opt/graft/projects/
-└── <project-name>/
-    ├── docker-compose.yml
-    ├── backend/          # (if using serverbuild)
-    └── frontend/         # (if using serverbuild)
-```
-
----
 
 ## Infrastructure Commands
 

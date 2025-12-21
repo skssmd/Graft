@@ -197,7 +197,7 @@ func runInit() {
 
 	fmt.Printf("\n✨ Project '%s' initialized!\n", projName)
 	fmt.Printf("Local config: .graft/config.json\n")
-	fmt.Printf("Boilerplate: graft-compose.yml\n", projName)
+	fmt.Printf("Boilerplate: graft-compose.yml\n")
 }
 
 func runHostInit() {
@@ -217,15 +217,18 @@ func runHostInit() {
 	// Ask about shared infrastructure
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("\n🗄️  Shared Infrastructure Setup")
-	fmt.Println("Do you want to add shared Postgres and Redis instances?")
-	fmt.Println("(Saves resources - all projects share one instance with separate databases)")
-	fmt.Print("\nSetup shared infrastructure? (y/n): ")
 	
-	confirm, _ := reader.ReadString('\n')
-	confirm = strings.ToLower(strings.TrimSpace(confirm))
-	setupInfra := confirm == "y" || confirm == "yes"
+	fmt.Print("Setup shared Postgres instance? (y/n): ")
+	confirmPG, _ := reader.ReadString('\n')
+	confirmPG = strings.ToLower(strings.TrimSpace(confirmPG))
+	setupPostgres := confirmPG == "y" || confirmPG == "yes"
 
-	err = hostinit.InitHost(client, setupInfra, os.Stdout, os.Stderr)
+	fmt.Print("Setup shared Redis instance? (y/n): ")
+	confirmRedis, _ := reader.ReadString('\n')
+	confirmRedis = strings.ToLower(strings.TrimSpace(confirmRedis))
+	setupRedis := confirmRedis == "y" || confirmRedis == "yes"
+
+	err = hostinit.InitHost(client, setupPostgres, setupRedis, os.Stdout, os.Stderr)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
