@@ -193,32 +193,53 @@ func SyncService(client *ssh.Client, p *Project, serviceName string, noCache, pa
 			return fmt.Errorf("Dockerfile not found: %s\n👉 Checked path: %s\n👉 Please check the 'dockerfile' field in your graft.yml and ensure the file exists and casing matches EXACTLY (Linux is case-sensitive!).", dockerfileName, dockerfilePath)
 		}
 
-		fmt.Fprintf(stdout, "📦 Creating tarball from %s...\n", contextPath)
+		fmt.Fprintf(stdout, "📦 Syncing source code with rsync (incremental)...\n")
 		contextName := filepath.Base(contextPath)
 		if contextName == "." || contextName == "/" {
 			contextName = serviceName
 		}
 
-		tarballPath := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s.tar.gz", p.Name, contextName))
-		if err := createTarball(contextPath, tarballPath); err != nil {
-			return fmt.Errorf("failed to create tarball: %v", err)
-		}
-		defer os.Remove(tarballPath)
-
-		// Upload tarball to server
-		remoteTarball := path.Join(remoteDir, fmt.Sprintf("%s.tar.gz", contextName))
-		fmt.Fprintf(stdout, "📤 Uploading source code...\n")
-		if err := client.UploadFile(tarballPath, remoteTarball); err != nil {
-			return fmt.Errorf("failed to upload tarball: %v", err)
-		}
-
-		// Extract on server
+		// Use rsync to sync the directory
 		serviceDir := path.Join(remoteDir, contextName)
-		extractCmd := fmt.Sprintf("rm -rf %s && mkdir -p %s && tar -xzf %s -C %s && rm %s", 
-			serviceDir, serviceDir, remoteTarball, serviceDir, remoteTarball)
-		fmt.Fprintf(stdout, "📂 Extracting on server...\n")
-		if err := client.RunCommand(extractCmd, stdout, stderr); err != nil {
-			return fmt.Errorf("failed to extract tarball: %v", err)
+		
+		// Ensure remote directory exists
+		if err := client.RunCommand(fmt.Sprintf("mkdir -p %s", serviceDir), stdout, stderr); err != nil {
+			return fmt.Errorf("failed to create remote directory: %v", err)
+		}
+		
+		// Try rsync first, fall back to tarball if rsync is not available
+		fmt.Fprintf(stdout, "📤 Uploading changes from %s...\n", contextPath)
+		rsyncErr := client.RsyncDirectory(contextPath, serviceDir, stdout, stderr)
+		
+		if rsyncErr != nil {
+			// Check if error is due to rsync not being found
+			if strings.Contains(rsyncErr.Error(), "rsync not found") {
+				fmt.Fprintf(stdout, "⚠️  Rsync not available, falling back to tarball method...\n")
+				
+				// Fall back to tarball method
+				tarballPath := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s.tar.gz", p.Name, contextName))
+				if err := createTarball(contextPath, tarballPath); err != nil {
+					return fmt.Errorf("failed to create tarball: %v", err)
+				}
+				defer os.Remove(tarballPath)
+
+				// Upload tarball to server
+				remoteTarball := path.Join(remoteDir, fmt.Sprintf("%s.tar.gz", contextName))
+				fmt.Fprintf(stdout, "📤 Uploading tarball...\n")
+				if err := client.UploadFile(tarballPath, remoteTarball); err != nil {
+					return fmt.Errorf("failed to upload tarball: %v", err)
+				}
+
+				// Extract on server
+				extractCmd := fmt.Sprintf("rm -rf %s && mkdir -p %s && tar -xzf %s -C %s && rm %s", 
+					serviceDir, serviceDir, remoteTarball, serviceDir, remoteTarball)
+				fmt.Fprintf(stdout, "📂 Extracting on server...\n")
+				if err := client.RunCommand(extractCmd, stdout, stderr); err != nil {
+					return fmt.Errorf("failed to extract tarball: %v", err)
+				}
+			} else {
+				return fmt.Errorf("failed to sync directory: %v", rsyncErr)
+			}
 		}
 
 		// Inject secrets and update context in compose file
@@ -344,33 +365,53 @@ func Sync(client *ssh.Client, p *Project, noCache, partial bool, stdout, stderr 
 				return fmt.Errorf("Dockerfile not found: %s\n👉 Checked path: %s\n👉 Please check the 'dockerfile' field in your graft.yml and ensure the file exists and casing matches EXACTLY (Linux is case-sensitive!).", dockerfileName, dockerfilePath)
 			}
 
-			fmt.Fprintf(stdout, "  📁 Creating tarball from %s...\n", contextPath)
+			fmt.Fprintf(stdout, "  📦 Syncing source code with rsync (incremental)...\n")
 			contextName := filepath.Base(contextPath)
 			if contextName == "." || contextName == "/" {
 				contextName = serviceName
 			}
 
-			tarballPath := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s.tar.gz", p.Name, contextName))
-			if err := createTarball(contextPath, tarballPath); err != nil {
-				return fmt.Errorf("failed to create tarball: %v", err)
-			}
-			defer os.Remove(tarballPath)
-
-			// Upload tarball to server
-			// Use path.Join for remote (Linux) paths to ensure forward slashes
-			remoteTarball := path.Join(remoteDir, fmt.Sprintf("%s.tar.gz", contextName))
-			fmt.Fprintf(stdout, "  📤 Uploading source code...\n")
-			if err := client.UploadFile(tarballPath, remoteTarball); err != nil {
-				return fmt.Errorf("failed to upload tarball: %v", err)
-			}
-
-			// Extract on server
+			// Use rsync to sync the directory
 			serviceDir := path.Join(remoteDir, contextName)
-			extractCmd := fmt.Sprintf("mkdir -p %s && tar -xzf %s -C %s && rm %s", 
-				serviceDir, remoteTarball, serviceDir, remoteTarball)
-			fmt.Fprintf(stdout, "  📂 Extracting on server...\n")
-			if err := client.RunCommand(extractCmd, stdout, stderr); err != nil {
-				return fmt.Errorf("failed to extract tarball: %v", err)
+			
+			// Ensure remote directory exists
+			if err := client.RunCommand(fmt.Sprintf("mkdir -p %s", serviceDir), stdout, stderr); err != nil {
+				return fmt.Errorf("failed to create remote directory: %v", err)
+			}
+			
+			// Try rsync first, fall back to tarball if rsync is not available
+			fmt.Fprintf(stdout, "  📤 Uploading changes from %s...\n", contextPath)
+			rsyncErr := client.RsyncDirectory(contextPath, serviceDir, stdout, stderr)
+			
+			if rsyncErr != nil {
+				// Check if error is due to rsync not being found
+				if strings.Contains(rsyncErr.Error(), "rsync not found") {
+					fmt.Fprintf(stdout, "  ⚠️  Rsync not available, falling back to tarball method...\n")
+					
+					// Fall back to tarball method
+					tarballPath := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s.tar.gz", p.Name, contextName))
+					if err := createTarball(contextPath, tarballPath); err != nil {
+						return fmt.Errorf("failed to create tarball: %v", err)
+					}
+					defer os.Remove(tarballPath)
+
+					// Upload tarball to server
+					remoteTarball := path.Join(remoteDir, fmt.Sprintf("%s.tar.gz", contextName))
+					fmt.Fprintf(stdout, "  📤 Uploading tarball...\n")
+					if err := client.UploadFile(tarballPath, remoteTarball); err != nil {
+						return fmt.Errorf("failed to upload tarball: %v", err)
+					}
+
+					// Extract on server
+					extractCmd := fmt.Sprintf("mkdir -p %s && tar -xzf %s -C %s && rm %s", 
+						serviceDir, remoteTarball, serviceDir, remoteTarball)
+					fmt.Fprintf(stdout, "  📂 Extracting on server...\n")
+					if err := client.RunCommand(extractCmd, stdout, stderr); err != nil {
+						return fmt.Errorf("failed to extract tarball: %v", err)
+					}
+				} else {
+					return fmt.Errorf("failed to sync directory: %v", rsyncErr)
+				}
 			}
 		}
 	}
