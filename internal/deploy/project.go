@@ -51,6 +51,9 @@ func (p *Project) Save(dir string) error {
 
 version: '3.8'
 
+name: %s
+domain: %s
+
 services:
   # Frontend Service (React/Vue/Angular/etc)
   frontend:
@@ -235,6 +238,7 @@ networks:
 `
 	
 	content := fmt.Sprintf(template,
+		p.Name, p.Domain, // New name and domain fields
 		p.Name, p.Domain, p.Name, // Header
 		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, // Frontend
 		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Backend

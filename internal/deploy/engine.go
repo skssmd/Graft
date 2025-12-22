@@ -45,6 +45,15 @@ func LoadProject(path string) (*Project, error) {
 	if err := yaml.Unmarshal(data, &p); err != nil {
 		return nil, err
 	}
+
+	// Fallback for projects where Name/Domain aren't in YAML
+	if p.Name == "" {
+		meta, err := config.LoadProjectMetadata()
+		if err == nil {
+			p.Name = meta.Name
+		}
+	}
+
 	return &p, nil
 }
 

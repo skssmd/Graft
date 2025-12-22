@@ -16,8 +16,15 @@ type ServerConfig struct {
 	KeyPath string `json:"key_path"`
 }
 
+type InfraConfig struct {
+	PostgresUser     string `json:"postgres_user"`
+	PostgresPassword string `json:"postgres_password"`
+	PostgresDB       string `json:"postgres_db"`
+}
+
 type GraftConfig struct {
 	Server ServerConfig `json:"server"`
+	Infra  InfraConfig  `json:"infra,omitempty"`
 }
 
 func GetGlobalConfigPath() string {
@@ -120,6 +127,7 @@ func LoadSecrets() (map[string]string, error) {
 type ProjectMetadata struct {
 	Name       string `json:"name"`
 	RemotePath string `json:"remote_path"`
+	Initialized bool `json:"initialized"`
 }
 
 // SaveProjectMetadata saves project metadata to .graft/project.json

@@ -228,7 +228,22 @@ func runHostInit() {
 	confirmRedis = strings.ToLower(strings.TrimSpace(confirmRedis))
 	setupRedis := confirmRedis == "y" || confirmRedis == "yes"
 
-	err = hostinit.InitHost(client, setupPostgres, setupRedis, os.Stdout, os.Stderr)
+	// Secure credentials for infrastructure
+	if setupPostgres && cfg.Infra.PostgresPassword == "" {
+		fmt.Println("🔐 Generating secure credentials for Postgres...")
+		cfg.Infra.PostgresUser = "graft_admin_" + config.GenerateRandomString(4)
+		cfg.Infra.PostgresPassword = config.GenerateRandomString(24)
+		cfg.Infra.PostgresDB = "graft_master_" + config.GenerateRandomString(4)
+		
+		// Save to config (global or local depends on how cfg was loaded)
+		// LoadConfig might have loaded local, we should probably save back to same
+		// But host init is usually a global thing. For now save it.
+		config.SaveConfig(cfg, strings.Contains(config.GetLocalConfigPath(), ".graft"))
+	}
+
+	err = hostinit.InitHost(client, setupPostgres, setupRedis, 
+		cfg.Infra.PostgresUser, cfg.Infra.PostgresPassword, cfg.Infra.PostgresDB, 
+		os.Stdout, os.Stderr)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -290,7 +305,9 @@ func runInfraInit(typ, name string) {
 
 	var url string
 	if typ == "postgres" {
-		url, err = infra.InitPostgres(client, name, os.Stdout, os.Stderr)
+		url, err = infra.InitPostgres(client, name, 
+			cfg.Infra.PostgresUser, cfg.Infra.PostgresPassword, cfg.Infra.PostgresDB, 
+			os.Stdout, os.Stderr)
 	} else {
 		url, err = infra.InitRedis(client, name, os.Stdout, os.Stderr)
 	}

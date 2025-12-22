@@ -8,12 +8,11 @@ import (
 	"github.com/skssmd/graft/internal/ssh"
 )
 
-func InitPostgres(client *ssh.Client, name string, stdout, stderr io.Writer) (string, error) {
+func InitPostgres(client *ssh.Client, name, rootUser, rootPass, rootDB string, stdout, stderr io.Writer) (string, error) {
 	fmt.Fprintf(stdout, "🐘 Creating isolated Postgres database: %s\n", name)
 	
 	// Connect to the shared 'graft-postgres' container and create the database
-	// Use -d graft_internal to connect to the default database first
-	cmd := fmt.Sprintf(`sudo docker exec graft-postgres psql -U graft -d graft_internal -c "CREATE DATABASE %s;"`, name)
+	cmd := fmt.Sprintf(`sudo docker exec graft-postgres psql -U %s -d %s -c "CREATE DATABASE %s;"`, rootUser, rootDB, name)
 
 	if err := client.RunCommand(cmd, stdout, stderr); err != nil {
 		// If it fails, maybe the DB already exists, which is fine for idempotency
@@ -21,7 +20,7 @@ func InitPostgres(client *ssh.Client, name string, stdout, stderr io.Writer) (st
 	}
 
 	// Use the container name as host since they will be in the same graft-public network
-	url := fmt.Sprintf("postgres://graft:password@graft-postgres:5432/%s", name)
+	url := fmt.Sprintf("postgres://%s:%s@graft-postgres:5432/%s", rootUser, rootPass, name)
 	return url, nil
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/skssmd/graft/internal/ssh"
 )
 
-func InitHost(client *ssh.Client, setupPostgres, setupRedis bool, stdout, stderr io.Writer) error {
+func InitHost(client *ssh.Client, setupPostgres, setupRedis bool, pgUser, pgPass, pgDB string, stdout, stderr io.Writer) error {
 	// Detect OS and set appropriate package manager commands
 	var dockerInstallCmd, composeInstallCmd string
 	
@@ -141,16 +141,16 @@ sudo docker compose -f /opt/graft/gateway/docker-compose.yml up -d`,
 		
 		var services string
 		if setupPostgres {
-			services += `  postgres:
+			services += fmt.Sprintf(`  postgres:
     container_name: graft-postgres
     image: postgres:alpine
     environment:
-      POSTGRES_USER: graft
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: graft_internal
+      POSTGRES_USER: %s
+      POSTGRES_PASSWORD: %s
+      POSTGRES_DB: %s
     networks:
       - graft-public
-`
+`, pgUser, pgPass, pgDB)
 		}
 		if setupRedis {
 			services += `  redis:
