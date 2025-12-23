@@ -503,6 +503,9 @@ graft sync --git --commit $CI_COMMIT_SHA --no-cache
 
 ## File Structure
 
+> [!NOTE]
+> The `frontend` and `backend` directories shown below are just for reference. You can set up your own folder structure and services exactly as you would with standard Docker Compose.
+
 ### Local Project
 ```
 your-project/
