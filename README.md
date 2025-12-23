@@ -1,0 +1,59 @@
+```text
+ ██████  ██████   █████  ███████ ████████ 
+██       ██   ██ ██   ██ ██         ██    
+██   ███ ██████  ███████ █████      ██    
+██    ██ ██   ██ ██   ██ ██         ██    
+ ██████  ██   ██ ██   ██ ██         ██    
+```
+
+# Graft 🚀
+
+**Graft** is a powerful, interactive CLI tool designed to simplify the deployment and management of Docker-based projects on remote Linux servers. It bridges the gap between local development and remote production by providing a seamless synchronization and management experience.
+
+## ✨ Key Features
+
+- **Instant Sync**: Deploy your local code to a remote server with `graft sync`. Supports rsync for speed and Git for version-specific deployments.
+- **Project Contexts**: Jump between projects anywhere on your machine using `graft -p <name>`.
+- **Infrastructure on Demand**: Quickly initialize shared Postgres or Redis instances with `graft db init` or `graft redis init`.
+- **Remote Project Registry**: Keep track of all your projects on the server with automated remote registration and conflict detection.
+- **Registry Management**: Manage multiple servers in a global registry (`graft registry ls/add/del`).
+- **Shell Access**: Direct interactive SSH sessions or non-interactive command execution via `graft -sh`.
+- **Project Pulling**: "Clone" a project from a remote server to any local machine using `graft pull`.
+
+## 🛠️ Installation & Build
+
+### Prerequisites
+- **Go**: Version 1.24+ recommended.
+- **Rsync**: Required for fast file synchronization.
+- **SSH**: Access to your target Linux server with key-based authentication.
+
+### Building from Source
+1. Clone this repository.
+2. Build the binary using Go:
+   ```bash
+   go build -o graft.exe cmd/graft/main.go
+   ```
+3. (Optional) Add the binary to your system PATH for easier access.
+
+## 📖 Documentation
+
+For a complete reference of all available commands and flags, please see the [COMMANDS.md](COMMANDS.md) file.
+
+## 🚀 Quick Start
+
+```bash
+# 1. Initialize a new project (select a server or add a new one)
+graft init
+
+# 2. Deploy your project for the first time
+graft sync
+
+# 3. Check service status
+graft ps
+
+# 4. View logs
+graft logs backend
+```
+
+---
+Built with ❤️ by the Graft contributors.
