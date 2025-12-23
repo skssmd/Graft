@@ -27,8 +27,10 @@ sudo curl -SL https://github.com/docker/buildx/releases/download/v0.12.1/buildx-
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx`
 	} else if err := client.RunCommand("cat /etc/os-release | grep -i 'ubuntu\\|debian'", nil, nil); err == nil {
 		fmt.Fprintln(stdout, "🔍 Detected: Ubuntu/Debian")
-		dockerInstallCmd = "sudo apt-get update && sudo apt-get install -y docker.io && sudo systemctl start docker && sudo systemctl enable docker"
-		composeInstallCmd = "sudo apt-get install -y docker-compose-v2 docker-buildx-plugin"
+		dockerInstallCmd = "curl -fsSL https://get.docker.com | sudo sh && sudo systemctl start docker && sudo systemctl enable docker && sudo usermod -aG docker $USER"
+		composeInstallCmd = `sudo mkdir -p /usr/local/lib/docker/cli-plugins && \
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose && \
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose`
 	} else {
 		fmt.Fprintln(stdout, "🔍 Detected: Generic Linux (using Docker install script)")
 		dockerInstallCmd = "curl -fsSL https://get.docker.com | sudo sh && sudo systemctl start docker && sudo systemctl enable docker && sudo usermod -aG docker $USER"
