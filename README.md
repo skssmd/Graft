@@ -70,5 +70,3 @@ graft ps
 graft logs backend
 ```
 
----
-Built with ❤️ by the Graft contributors.
