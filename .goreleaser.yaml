@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-version: 1
+version: 2
 
 before:
   hooks:
@@ -42,4 +42,4 @@ snapshot:
 release:
   footer: |
     ---
-    Released by **Dipto** using [GoReleaser](https://github.com/goreleaser/goreleaser).
+    Released by **skssmd** using [GoReleaser](https://github.com/goreleaser/goreleaser).
