@@ -172,7 +172,72 @@ func SyncService(client *ssh.Client, p *Project, serviceName string, noCache, he
 	mode := getGraftMode(service.Labels)
 	fmt.Fprintf(stdout, "📦 Mode: %s\n", mode)
 
+	// Check if this is an image-based service (no build context)
+	isImageBased := service.Image != "" && service.Build == nil
+	
+	if isImageBased {
+		// For image-based services, upload compose file and pull the image
+		fmt.Fprintf(stdout, "🖼️  Image-based service detected: %s\n", service.Image)
+		
+		// Inject secrets into the compose file
+		content, err := os.ReadFile(localFile)
+		if err != nil {
+			return err
+		}
+
+		secrets, _ := config.LoadSecrets()
+		contentStr := string(content)
+		for key, value := range secrets {
+			contentStr = strings.ReplaceAll(contentStr, fmt.Sprintf("${%s}", key), value)
+		}
+
+		// Upload modified docker-compose.yml
+		tmpFile := filepath.Join(os.TempDir(), "docker-compose.yml")
+		if err := os.WriteFile(tmpFile, []byte(contentStr), 0644); err != nil {
+			return err
+		}
+		defer os.Remove(tmpFile)
+
+		remoteCompose := path.Join(remoteDir, "docker-compose.yml")
+		if err := client.UploadFile(tmpFile, remoteCompose); err != nil {
+			return err
+		}
+		
+		if heave {
+			return nil // Heave sync ends here
+		}
+
+		// Stop the old container
+		fmt.Fprintf(stdout, "🛑 Stopping old container...\n")
+		stopCmd := fmt.Sprintf("cd %s && sudo docker compose stop %s && sudo docker compose rm -f %s", remoteDir, serviceName, serviceName)
+		client.RunCommand(stopCmd, stdout, stderr) // Ignore errors if container doesn't exist
+
+		// Pull the latest image
+		fmt.Fprintf(stdout, "📥 Pulling latest image...\n")
+		pullCmd := fmt.Sprintf("cd %s && sudo docker compose pull %s", remoteDir, serviceName)
+		if err := client.RunCommand(pullCmd, stdout, stderr); err != nil {
+			return fmt.Errorf("image pull failed: %v", err)
+		}
+
+		// Start the service with the new image
+		fmt.Fprintf(stdout, "🚀 Starting %s...\n", serviceName)
+		upCmd := fmt.Sprintf("cd %s && sudo docker compose up -d %s", remoteDir, serviceName)
+		if err := client.RunCommand(upCmd, stdout, stderr); err != nil {
+			return err
+		}
+
+		// Cleanup old images
+		fmt.Fprintln(stdout, "🧹 Cleaning up old images...")
+		cleanupCmd := "sudo docker image prune -f"
+		if err := client.RunCommand(cleanupCmd, stdout, stderr); err != nil {
+			fmt.Fprintf(stdout, "⚠️  Cleanup warning: %v\n", err)
+		}
+
+		return nil
+	}
+
 	if mode == "serverbuild" && service.Build != nil {
+
 		// Upload source code for this service only
 		contextPath := service.Build.Context
 		if !filepath.IsAbs(contextPath) {
@@ -629,8 +694,8 @@ func Sync(client *ssh.Client, p *Project, noCache, heave, useGit bool, gitBranch
 		}
 	}
 
-	fmt.Fprintln(stdout, "� Starting services...")
-	if err := client.RunCommand(fmt.Sprintf("cd %s && sudo docker compose up -d --remove-orphans", remoteDir), stdout, stderr); err != nil {
+	fmt.Fprintln(stdout, "🚀 Starting services...")
+	if err := client.RunCommand(fmt.Sprintf("cd %s && sudo docker compose up -d --pull always --remove-orphans", remoteDir), stdout, stderr); err != nil {
 		return err
 	}
 

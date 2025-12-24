@@ -72,7 +72,7 @@ func main() {
 		runInit(args[1:])
 	case "host":
 		if len(args) < 2 {
-			fmt.Println("Usage: graft host [init|clean|sh]")
+			fmt.Println("Usage: graft host [init|clean|sh|self-destruct]")
 			return
 		}
 		switch args[1] {
@@ -82,8 +82,10 @@ func main() {
 			runHostClean()
 		case "sh", "-sh", "--sh":
 			runHostShell(args[2:])
+		case "self-destruct":
+			runHostSelfDestruct()
 		default:
-			fmt.Println("Usage: graft host [init|clean|sh]")
+			fmt.Println("Usage: graft host [init|clean|sh|self-destruct]")
 		}
 	case "db":
 		if len(args) < 3 || args[2] != "init" {
@@ -98,7 +100,15 @@ func main() {
 		}
 		runInfraInit("redis", args[1])
 	case "infra":
-		runInfra(args[1:])
+		if len(args) < 2 {
+			fmt.Println("Usage: graft infra [db|redis] ports:<value> | graft infra reload")
+			return
+		}
+		if args[1] == "reload" {
+			runInfraReload()
+		} else {
+			runInfra(args[1:])
+		}
 	case "logs":
 		if len(args) < 2 {
 			fmt.Println("Usage: graft logs <service>")
@@ -137,31 +147,31 @@ func main() {
 		} else {
 			fmt.Println("Usage: graft projects ls")
 		}
-	case "pull":
+	case "pullfromhost":
 		if registryContext == "" {
 			fmt.Println("Error: Pulling requires a registry context. Use 'graft -r <registry> pull <project>'")
 			return
 		}
 		if len(args) < 2 {
-			fmt.Println("Usage: graft -r <registry> pull <project>")
+			fmt.Println("Usage: graft -r <registry> pullfromhost <project>")
 			return
 		}
 		runPull(registryContext, args[1])
 	default:
 		// Handle the --pull flag as requested in the specific format
-		foundPull := false
-		for i, arg := range os.Args {
-			if arg == "--pull" && i+1 < len(os.Args) {
-				if registryContext == "" {
-					fmt.Println("Error: Pulling requires a registry context. Use 'graft -r <registry> --pull <project>'")
-					return
-				}
-				runPull(registryContext, os.Args[i+1])
-				foundPull = true
-				break
-			}
-		}
-		if foundPull { return }
+		// foundPull := false
+		// for i, arg := range os.Args {
+		// 	if arg == "--pull" && i+1 < len(os.Args) {
+		// 		if registryContext == "" {
+		// 			fmt.Println("Error: Pulling requires a registry context. Use 'graft -r <registry> --pull <project>'")
+		// 			return
+		// 		}
+		// 		runPull(registryContext, os.Args[i+1])
+		// 		foundPull = true
+		// 		break
+		// 	}
+		// }
+		// if foundPull { return }
 
 		// Pass through to docker compose for any other command
 		runDockerCompose(args)
@@ -181,8 +191,9 @@ func printUsage() {
 	fmt.Println("  registry [ls|add|del]     Manage registered servers")
 	fmt.Println("  projects ls               List local projects")
 	fmt.Println("  pull <project>            Pull/Clone project from remote")
-	fmt.Println("  host [init|clean|sh]      Manage current project's host context")
+	fmt.Println("  host [init|clean|sh|self-destruct]  Manage current project's host context")
 	fmt.Println("  infra [db|redis] ports:<v> Change infra port mapping (null to hide)")
+	fmt.Println("  infra reload              Pull and reload infrastructure services")
 	fmt.Println("  db/redis <name> init      Initialize shared infrastructure")
 	fmt.Println("  sync [service] [-h]       Deploy project to server")
 	fmt.Println("  logs <service>            Stream service logs")
@@ -1165,4 +1176,151 @@ func runInfra(args []string) {
 	// Save updated config locally
 	config.SaveConfig(cfg, true)
 	fmt.Println("\n✅ Infrastructure updated successfully!")
+}
+
+func runInfraReload() {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		fmt.Println("Error: No config found.")
+		return
+	}
+
+	client, err := ssh.NewClient(cfg.Server.Host, cfg.Server.Port, cfg.Server.User, cfg.Server.KeyPath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	fmt.Println("🔄 Reloading infrastructure (pulling latest images)...")
+	
+	// Use docker compose up -d --pull always to pull and reload
+	reloadCmd := "cd /opt/graft/infra && sudo docker compose up -d --pull always"
+	if err := client.RunCommand(reloadCmd, os.Stdout, os.Stderr); err != nil {
+		fmt.Printf("Error reloading infrastructure: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n✅ Infrastructure reloaded successfully!")
+}
+
+func runHostSelfDestruct() {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		fmt.Println("Error: No config found.")
+		return
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	
+	fmt.Println("\n⚠️  WARNING: DESTRUCTIVE OPERATION ⚠️")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("This will PERMANENTLY DELETE all Graft infrastructure on:\n")
+	fmt.Printf("  Host: %s\n", cfg.Server.Host)
+	fmt.Printf("  Registry: %s\n\n", cfg.Server.RegistryName)
+	fmt.Println("The following will be destroyed:")
+	fmt.Println("  • Gateway (Traefik) - including SSL certificates")
+	fmt.Println("  • Infrastructure (Postgres, Redis) - including ALL DATA")
+	fmt.Println("  • All Projects - including volumes and images")
+	fmt.Println("  • All Docker networks created by Graft")
+	fmt.Println("  • All files in /opt/graft/")
+	fmt.Println("\n⚠️  THIS CANNOT BE UNDONE! ⚠️")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	
+	fmt.Print("\nType 'DESTROY' (all caps) to confirm: ")
+	confirm, _ := reader.ReadString('\n')
+	confirm = strings.TrimSpace(confirm)
+	
+	if confirm != "DESTROY" {
+		fmt.Println("❌ Self-destruct aborted. No changes made.")
+		return
+	}
+	
+	fmt.Print("\nAre you absolutely sure? Type 'YES' to proceed: ")
+	finalConfirm, _ := reader.ReadString('\n')
+	finalConfirm = strings.TrimSpace(finalConfirm)
+	
+	if finalConfirm != "YES" {
+		fmt.Println("❌ Self-destruct aborted. No changes made.")
+		return
+	}
+
+	client, err := ssh.NewClient(cfg.Server.Host, cfg.Server.Port, cfg.Server.User, cfg.Server.KeyPath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	defer client.Close()
+
+	fmt.Println("\n💥 Initiating self-destruct sequence...")
+	
+	// Step 1: Get list of all projects
+	fmt.Println("\n[1/7] 📋 Discovering projects...")
+	tmpFile := filepath.Join(os.TempDir(), "projects_list.json")
+	var projects []string
+	if err := client.DownloadFile(config.RemoteProjectsPath, tmpFile); err == nil {
+		data, _ := os.ReadFile(tmpFile)
+		var projectMap map[string]string
+		if json.Unmarshal(data, &projectMap) == nil {
+			for name := range projectMap {
+				projects = append(projects, name)
+			}
+		}
+		os.Remove(tmpFile)
+	}
+	
+	if len(projects) > 0 {
+		fmt.Printf("      Found %d project(s): %v\n", len(projects), projects)
+	} else {
+		fmt.Println("      No projects found")
+	}
+	
+	// Step 2: Tear down all projects
+	if len(projects) > 0 {
+		fmt.Println("\n[2/7] 🗑️  Destroying all projects...")
+		for _, project := range projects {
+			fmt.Printf("      Destroying project: %s\n", project)
+			projectPath := fmt.Sprintf("/opt/graft/projects/%s", project)
+			
+			// Stop and remove all containers, volumes, and networks for this project
+			destroyCmd := fmt.Sprintf("cd %s && sudo docker compose down -v --remove-orphans 2>/dev/null || true", projectPath)
+			client.RunCommand(destroyCmd, os.Stdout, os.Stderr)
+		}
+	} else {
+		fmt.Println("\n[2/7] ⏭️  Skipping projects (none found)")
+	}
+	
+	// Step 3: Tear down infrastructure (Postgres, Redis)
+	fmt.Println("\n[3/7] 🗄️  Destroying infrastructure (Postgres, Redis)...")
+	infraCmd := "cd /opt/graft/infra && sudo docker compose down -v --remove-orphans 2>/dev/null || true"
+	client.RunCommand(infraCmd, os.Stdout, os.Stderr)
+	
+	// Step 4: Tear down gateway (Traefik)
+	fmt.Println("\n[4/7] 🌐 Destroying gateway (Traefik)...")
+	gatewayCmd := "cd /opt/graft/gateway && sudo docker compose down -v --remove-orphans 2>/dev/null || true"
+	client.RunCommand(gatewayCmd, os.Stdout, os.Stderr)
+	
+	// Step 5: Remove all Graft-related images
+	fmt.Println("\n[5/7] 🖼️  Removing all Docker images...")
+	pruneImagesCmd := "sudo docker image prune -af"
+	client.RunCommand(pruneImagesCmd, os.Stdout, os.Stderr)
+	
+	// Step 6: Remove Graft networks
+	fmt.Println("\n[6/7] 🔌 Removing Graft networks...")
+	removeNetworkCmd := "sudo docker network rm graft-public 2>/dev/null || true"
+	client.RunCommand(removeNetworkCmd, os.Stdout, os.Stderr)
+	
+	// Step 7: Remove all Graft files
+	fmt.Println("\n[7/7] 📁 Removing all Graft files...")
+	removeFilesCmd := "sudo rm -rf /opt/graft"
+	if err := client.RunCommand(removeFilesCmd, os.Stdout, os.Stderr); err != nil {
+		fmt.Printf("      ⚠️  Warning: %v\n", err)
+	}
+	
+	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("💥 Self-destruct complete!")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("\nThe server has been cleaned of all Graft infrastructure.")
+	fmt.Println("Docker and Docker Compose remain installed.")
+	fmt.Println("\n💡 You can run 'graft host init' to set up a fresh environment.")
 }

@@ -93,6 +93,38 @@ graft host clean
 
 ---
 
+### `graft host self-destruct`
+**⚠️ DESTRUCTIVE OPERATION ⚠️** - Completely tear down all Graft infrastructure on the server.
+
+```bash
+graft host self-destruct
+```
+
+**What it does:**
+1. Discovers all projects on the server
+2. Tears down all projects (stops containers, removes volumes)
+3. Tears down infrastructure (Postgres, Redis with ALL DATA)
+4. Tears down gateway (Traefik, including SSL certificates)
+5. Removes all Docker images
+6. Removes Graft networks
+7. Deletes all files in `/opt/graft/`
+
+**Safety features:**
+- Requires typing `DESTROY` to confirm
+- Requires typing `YES` for final confirmation
+- Shows exactly what will be deleted
+- Cannot be undone
+
+**Use when:**
+- Completely removing Graft from a server
+- Starting fresh with a clean slate
+- Decommissioning a server
+- Testing/development cleanup
+
+**Note:** Docker and Docker Compose remain installed. You can run `graft host init` afterwards to set up a fresh environment.
+
+---
+
 
 
 ## Infrastructure Commands
@@ -162,6 +194,25 @@ graft infra redis ports:null
 
 ---
 
+### `graft infra reload`
+Pull and reload infrastructure services (Postgres and Redis).
+
+```bash
+graft infra reload
+```
+
+**What it does:**
+- Pulls the latest images for infrastructure services (Postgres, Redis).
+- Restarts the infrastructure stack with the latest images.
+- Uses `docker compose up -d --pull always` to ensure latest versions.
+
+**Use when:**
+- You want to update Postgres or Redis to the latest version
+- After infrastructure configuration changes
+- To ensure infrastructure is running the latest stable images
+
+---
+
 ## Deployment Commands
 
 ### `graft sync`
@@ -186,6 +237,13 @@ graft sync -h                 # Heave sync (upload only, no build)
 - **Normal:** Uses Docker cache for faster builds
 - **--no-cache:** Clears build cache and forces fresh build
 - **-h, --heave:** Heave sync. Performs uploads but skips the build and start steps on the server. Useful for stage-building or manual verification.
+
+**Service Types:**
+- **Build-based services** (with `build` context): Source code is uploaded and built on the server
+- **Image-based services** (with `image` only): Latest image is pulled from registry before starting
+  - ✅ Automatically pulls latest image version
+  - ✅ No source code upload needed
+  - ✅ Perfect for using pre-built images from Docker Hub or private registries
 
 **Git-Based Sync:**
 
@@ -348,8 +406,8 @@ graft port backend 5000               # Show port mapping
 graft images
 
 # Pull images
-graft pull                            # Pull all images
-graft pull backend                    # Pull specific image
+graft pullfromhost                          # Pull all images
+graft pullfromhost backend                    # Pull specific image
 
 # Build images
 graft build                           # Build all images
