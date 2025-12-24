@@ -16,16 +16,15 @@ builds:
       - linux
       - windows
       - darwin
-      - freebsd  # Added FreeBSD
+      - freebsd
     goarch:
       - amd64
       - arm64
-      - arm      # Added ARM v7
-      - "386"    # Added 32-bit
+      - arm
+      - "386"
     goarm:
       - "7"
     ignore:
-      # Skip unsupported combinations
       - goos: darwin
         goarch: "386"
       - goos: darwin
@@ -33,7 +32,6 @@ builds:
       - goos: windows
         goarch: arm
     ldflags:
-      # Add version info to binary
       - -s -w
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
@@ -81,13 +79,11 @@ checksum:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
-# Generate SBOM (Software Bill of Materials)
 sboms:
   - artifacts: archive
     documents:
       - "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sbom.json"
 
-# Sign checksums with cosign (for SLSA)
 signs:
   - cmd: cosign
     env:
@@ -111,24 +107,18 @@ release:
   prerelease: auto
   name_template: "{{ .ProjectName }} {{ .Version }}"
   header: |
-    ## 🚀 Installation
+    ## Installation
 
-    ### Quick Install (Linux/macOS/WSL)
+    ### Quick Install Script
+
+    **Linux/macOS/WSL:**
 ```bash
     curl -fsSL https://raw.githubusercontent.com/skssmd/Graft/main/install.sh | sh
 ```
 
-    ### Windows (PowerShell)
-```powershell
-    irm https://raw.githubusercontent.com/skssmd/Graft/main/install.ps1 | iex
-```
-
-    ### Package Managers
-    - **Winget**: `winget install skssmd.Graft`
-    - **AUR**: `yay -S graft`
 
     ### Manual Download
-    Download the archive for your platform below.
+    Download the appropriate archive for your platform below, extract it, and add to your PATH.
   
   footer: |
     ---
@@ -138,4 +128,4 @@ release:
     Released by **skssmd** using [GoReleaser](https://github.com/goreleaser/goreleaser).
 
 announce:
-  skip: '{{gt .Patch 0}}'  # Only announce major/minor releases, not patches
+  skip: '{{gt .Patch 0}}'
