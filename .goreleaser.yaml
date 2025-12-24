@@ -7,8 +7,7 @@ before:
     - go generate ./...
 
 builds:
-  - id: graft
-    main: ./cmd/graft
+  - main: ./cmd/graft
     binary: graft
     env:
       - CGO_ENABLED=0
@@ -16,116 +15,31 @@ builds:
       - linux
       - windows
       - darwin
-      - freebsd
     goarch:
       - amd64
       - arm64
-      - arm
-      - "386"
-    goarm:
-      - "7"
-    ignore:
-      - goos: darwin
-        goarch: "386"
-      - goos: darwin
-        goarch: arm
-      - goos: windows
-        goarch: arm
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-      - -X main.builtBy=goreleaser
 
 archives:
-  - id: graft-archive
+  - # This template ensures your folders look like: Graft_1.0.5_linux_amd64
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ title .Os }}_{{ .Arch }}"
-    format: tar.gz
     format_overrides:
       - goos: windows
-        format: zip
-    files:
-      - README.md
-      - LICENSE*
-      - CHANGELOG.md
+        formats: [zip]
 
 changelog:
   sort: asc
-  use: github
   filters:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^chore:"
-      - "typo"
-  groups:
-    - title: Features
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
-      order: 0
-    - title: 'Bug Fixes'
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
-      order: 1
-    - title: 'Performance'
-      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
-      order: 2
-    - title: Others
-      order: 999
 
 checksum:
   name_template: "checksums.txt"
-  algorithm: sha256
 
 snapshot:
-  version_template: "{{ incpatch .Version }}-next"
-
-sboms:
-  - artifacts: archive
-    documents:
-      - "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sbom.json"
-
-signs:
-  - cmd: cosign
-    env:
-      - COSIGN_EXPERIMENTAL=1
-    certificate: '${artifact}.pem'
-    signature: '${artifact}.sig'
-    args:
-      - sign-blob
-      - '--output-certificate=${certificate}'
-      - '--output-signature=${signature}'
-      - '${artifact}'
-      - --yes
-    artifacts: checksum
-    output: true
+  version_template: "{{ .Tag }}-next"
 
 release:
-  github:
-    owner: skssmd
-    name: Graft
-  draft: false
-  prerelease: auto
-  name_template: "{{ .ProjectName }} {{ .Version }}"
-  header: |
-    ## Installation
-
-    ### Quick Install Script
-
-    **Linux/macOS/WSL:**
-```bash
-    curl -fsSL https://raw.githubusercontent.com/skssmd/Graft/main/install.sh | sh
-```
-
-
-    ### Manual Download
-    Download the appropriate archive for your platform below, extract it, and add to your PATH.
-  
   footer: |
     ---
-    
-    **Full Changelog**: https://github.com/skssmd/Graft/compare/{{ .PreviousTag }}...{{ .Tag }}
-    
-    Released by **skssmd** using [GoReleaser](https://github.com/goreleaser/goreleaser).
-
-announce:
-  skip: '{{gt .Patch 0}}'
+    Released by **Dipto** using [GoReleaser](https://github.com/goreleaser/goreleaser).
