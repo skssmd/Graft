@@ -44,9 +44,9 @@ curl -sSL https://raw.githubusercontent.com/skssmd/Graft/main/bin/install.sh | s
 ```
 
 ### Quick Installation (Windows)
-Download the binary via PowerShell:
+Run the following command in PowerShell:
 ```powershell
-wget install graft
+powershell -ExecutionPolicy ByPass -Command "iwr -useb https://raw.githubusercontent.com/skssmd/Graft/main/bin/install.ps1 | iex"
 ```
 
 ### Prerequisites

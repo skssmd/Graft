@@ -137,6 +137,31 @@ environment:
 
 ---
 
+### `graft infra [db|redis] ports:<value>`
+Manage port visibility for shared infrastructure services.
+
+```bash
+# Reveal Postgres port 5432 to the internet
+graft infra db ports:5432
+
+# Hide Postgres port from the internet
+graft infra db ports:null
+
+# Reveal Redis port 6379 to the internet
+graft infra redis ports:6379
+
+# Hide Redis port from the internet
+graft infra redis ports:null
+```
+
+**What it does:**
+- Updates the remote infrastructure configuration.
+- Modifies the host port mapping in the shared `docker-compose.yml`.
+- Restarts the infrastructure stack to apply changes.
+- Syncs the port setting to your local project configuration.
+
+---
+
 ## Deployment Commands
 
 ### `graft sync`
@@ -648,6 +673,7 @@ graft exec backend sh
 - `graft -r <srv> [projects ls|pull|-sh]` - Server-context commands
 - `graft -sh [cmd]` - Execute directly on target server
 - `graft host init/clean/sh` - Manage current server context
+- `graft infra [db|redis] ports:<v>` - Manage infra ports
 - `graft db <name> init` - Create database
 - `graft redis <name> init` - Create Redis instance
 - `graft sync [service] [-h] [--git] [--branch <name>] [--commit <hash>]` - Deploy

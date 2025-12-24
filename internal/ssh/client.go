@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/term"
 )
 
 type Client struct {
@@ -93,20 +94,25 @@ func (c *Client) RunCommand(cmd string, stdout, stderr io.Writer) error {
 }
 
 func (c *Client) InteractiveSession() error {
-	keyPath := c.keyPath
-	
 	// Verify key exists
-	if _, err := os.Stat(keyPath); err != nil {
-		return fmt.Errorf("ssh key not found: %s", keyPath)
+	if _, err := os.Stat(c.keyPath); err != nil {
+		return fmt.Errorf("ssh key not found: %s", c.keyPath)
 	}
 
 	// Find best ssh command
 	sshCmd, isWSL := findSSH()
-	
+
+	// If on Windows and no WSL, use simulated session as fallback
+	// This avoids the strict file permission requirements of Windows OpenSSH
+	if runtime.GOOS == "windows" && !isWSL {
+		fmt.Println("⚠️  WSL not detected. Using simulated terminal (fallback). Please install WSL to get a better experience.")
+		return c.SimulatedSession()
+	}
+
 	args := []string{}
 	if isWSL {
 		wslKeyPath := "~/.ssh/graft_key.pem"
-		windowsKeyWSL := convertToUnixPath(keyPath, true)
+		windowsKeyWSL := convertToUnixPath(c.keyPath, true)
 		
 		// Copy key to WSL filesystem and set proper permissions
 		copyCmd := exec.Command("wsl", "bash", "-c", 
@@ -118,7 +124,7 @@ func (c *Client) InteractiveSession() error {
 		
 		args = []string{"ssh", "-i", wslKeyPath, "-p", fmt.Sprintf("%d", c.port), "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%s@%s", c.user, c.host)}
 	} else {
-		args = []string{"-i", keyPath, "-p", fmt.Sprintf("%d", c.port), "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%s@%s", c.user, c.host)}
+		args = []string{"-i", c.keyPath, "-p", fmt.Sprintf("%d", c.port), "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%s@%s", c.user, c.host)}
 	}
 
 	cmd := exec.Command(sshCmd, args...)
@@ -127,6 +133,52 @@ func (c *Client) InteractiveSession() error {
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func (c *Client) SimulatedSession() error {
+	session, err := c.client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	// Set up terminal modes
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,     // enable echoing
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+	}
+
+	// Get terminal size
+	fd := int(os.Stdin.Fd())
+	width, height, err := term.GetSize(fd)
+	if err != nil {
+		width, height = 80, 40 // Fallback
+	}
+
+	// Request pseudo terminal
+	if err := session.RequestPty("xterm-256color", height, width, modes); err != nil {
+		return fmt.Errorf("request for pseudo terminal failed: %v", err)
+	}
+
+	session.Stdin = os.Stdin
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
+	// Put local terminal into raw mode
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		return fmt.Errorf("failed to set raw mode: %v", err)
+	}
+	defer term.Restore(fd, oldState)
+
+	// Start shell on remote
+	if err := session.Shell(); err != nil {
+		return fmt.Errorf("failed to start shell: %v", err)
+	}
+
+	// Wait for session to finish
+	return session.Wait()
 }
 
 // findSSH attempts to find the best SSH client. On Windows, it prefers WSL to avoid permission issues.
