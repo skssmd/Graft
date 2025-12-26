@@ -84,19 +84,24 @@ services:
     
     labels:
       # Graft deployment mode: localbuild | serverbuild
-      # - localbuild: Build image locally, push to server, run
-      # - serverbuild: Copy source to server, build & run there
       - "graft.mode=serverbuild"
       
-      # Traefik routing - serves all requests to %s/
+      # Enable Traefik for this container
       - "traefik.enable=true"
+
+      # 1. Define the Router (The "Entry" rule)
+      # serves all requests to %s/
       - "traefik.http.routers.%s-frontend.rule=Host(` + "`%s`" + `)"
       - "traefik.http.routers.%s-frontend.priority=1"
-      - "traefik.http.services.%s-frontend.loadbalancer.server.port=3000" #this is the internal container port that the frontend service is running on
+
+      # 2. Define the Service (The "Destination")
+      # This links the router above to the internal port 3000
+      - "traefik.http.routers.%s-frontend.service=%s-frontend-service"
+      - "traefik.http.services.%s-frontend-service.loadbalancer.server.port=3000"
       
-      # HTTPS with Let's Encrypt (uncomment to enable)
-      # - "traefik.http.routers.%s-frontend.entrypoints=websecure"
-      # - "traefik.http.routers.%s-frontend.tls.certresolver=letsencrypt"
+      # 3. HTTPS / TLS Configuration (Uncomment these once DNS is pointed to the server)
+      - "traefik.http.routers.%s-frontend.entrypoints=websecure"
+      - "traefik.http.routers.%s-frontend.tls.certresolver=letsencrypt"
     
     networks:
       - graft-public
@@ -155,17 +160,23 @@ services:
       # Graft deployment mode
       - "graft.mode=serverbuild"
       
-      # Traefik routing - serves %s/api/* and strips /api prefix
+      # Enable Traefik for this container
       - "traefik.enable=true"
+
+      # 1. Define the Router (The "Entry" rule)
+      # serves %s/api/* and strips /api prefix
       - "traefik.http.routers.%s-backend.rule=Host(` + "`%s`" + `) && PathPrefix(` + "`/api`" + `)"
+      - "traefik.http.routers.%s-backend.priority=1"
+      
+      # 2. Define the Service & Middleware
       - "traefik.http.middlewares.%s-backend-strip.stripprefix.prefixes=/api" 
       - "traefik.http.routers.%s-backend.middlewares=%s-backend-strip" 
-      - "traefik.http.services.%s-backend.loadbalancer.server.port=5000" #this is the internal container port that the backend service is running on
+      - "traefik.http.routers.%s-backend.service=%s-backend-service"
+      - "traefik.http.services.%s-backend-service.loadbalancer.server.port=5000"
       
-      
-      # HTTPS with Let's Encrypt (uncomment to enable)
-      # - "traefik.http.routers.%s-backend.entrypoints=websecure"
-      # - "traefik.http.routers.%s-backend.tls.certresolver=letsencrypt"
+      # 3. HTTPS / TLS Configuration (Uncomment these once DNS is pointed to the server)
+      - "traefik.http.routers.%s-backend.entrypoints=websecure"
+      - "traefik.http.routers.%s-backend.tls.certresolver=letsencrypt"
     
     networks:
       - graft-public
@@ -238,10 +249,9 @@ networks:
 `
 	
 	content := fmt.Sprintf(template,
-		p.Name, p.Domain, // New name and domain fields
-		p.Name, p.Domain, p.Name, // Header
-		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, // Frontend
-		p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Backend
+		p.Name, p.Domain, // Header info
+		p.Domain, p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Frontend: domain, name-router, domain-host, name-priority, name-router-service, name-service, name-service-port, name-router-entrypoints, name-router-tls
+		p.Domain, p.Name, p.Domain, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, p.Name, // Backend: domain, name-router, domain-host, name-priority, name-middleware, name-router-middleware, name-middleware-strip, name-router-service, name-service, name-service-port, name-router-entrypoints, name-router-tls
 		p.Domain, p.Domain, p.Domain, // Footer
 	)
 	// Create env directory if it doesn't exist
